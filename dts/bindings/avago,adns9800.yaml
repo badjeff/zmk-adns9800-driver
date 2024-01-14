@@ -1,0 +1,29 @@
+# Copyright (c) 2022 The ZMK Contributors
+# SPDX-License-Identifier: MIT
+description: |
+  Sensor driver for the pixart ADNS9800 optical mouse sensor 
+
+compatible: "avago,adns9800"
+
+include: spi-device.yaml
+
+properties:
+  label:
+    type: string
+    required: false
+    deprecated: true
+  irq-gpios:
+    type: phandle-array
+    required: true
+  evt-type:
+    type: int
+    required: true
+  x-input-code:
+    type: int
+    required: true
+  y-input-code:
+    type: int
+    required: true
+  input-channel:
+    type: int
+    default: 0

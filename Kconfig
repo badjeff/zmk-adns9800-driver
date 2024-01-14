@@ -1,0 +1,108 @@
+# Sensor data simulator
+#
+# Copyright (c) 2019 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menuconfig ADNS9800
+	bool "ADNS9800 mouse optical sensor"
+  select SPI
+	help
+	  Enable ADNS9800 mouse optical sensor.
+
+if ADNS9800
+
+config ADNS9800_CPI
+	int "ADNS9800's default CPI"
+	default 600
+	range 50 8200
+	help
+	  Default CPI value.
+
+config ADNS9800_CPI_DIVIDOR
+	int "ADNS9800's default CPI dividor"
+	default 1
+	range 1 12
+	help
+	  Default CPI dividor value.
+
+config ADNS9800_REPORT_INTERVAL_MIN
+	int "ADNS9800's default minimum report rate"
+	default 16
+	help
+	  Default minimum report interval in milliseconds.
+		Slow down input reporting for hid queue over the air.
+		Turn value down to 8ms to get sharp response if use with USB only.
+
+config ADNS9800_RUN_DOWNSHIFT_TIME_MS
+	int "ADNS9800's default RUN mode downshift time"
+	default 50
+	range 10 2550
+	help
+	  Default RUN mode downshift down time in milliseconds.
+	  Time after which sensor goes from RUN to REST1 mode.
+
+config ADNS9800_REST1_DOWNSHIFT_TIME_MS
+	int "ADNS9800's default REST1 mode downshift time"
+	default 5000
+	range 320 81600
+	help
+	  Default REST1 mode downshift down time in milliseconds.
+	  Time after which sensor goes from REST1 to REST2 mode.
+
+config ADNS9800_REST2_DOWNSHIFT_TIME_MS
+	int "ADNS9800's default REST2 mode downshift time"
+	default 15000
+	range 3200 816000
+	help
+	  Default REST2 mode downshift down time in milliseconds.
+	  Time after which sensor goes from REST2 to REST3 mode.
+
+config ADNS9800_REST1_RATE_MS
+	int "ADNS9800's default REST1 rate"
+	default 10
+	help
+	  Default REST1 mode sample rate in milliseconds.
+
+config ADNS9800_REST2_RATE_MS
+	int "ADNS9800's default REST2 rate"
+	default 20
+	help
+	  Default REST2 mode sample rate in milliseconds.
+
+config ADNS9800_REST3_RATE_MS
+	int "ADNS9800's default REST3 rate"
+	default 100
+	help
+	  Default REST3 mode sample rate in milliseconds.
+
+choice
+	prompt "Select ADNS9800 sensor orientation"
+	default ADNS9800_ORIENTATION_0
+
+config ADNS9800_ORIENTATION_0
+	bool "ADNS9800 not rotated"
+
+config ADNS9800_ORIENTATION_90
+	bool "ADNS9800 rotated 90 deg clockwise"
+
+config ADNS9800_ORIENTATION_180
+	bool "ADNS9800 rotated 180 deg clockwise"
+
+config ADNS9800_ORIENTATION_270
+	bool "ADNS9800 rotated 270 deg clockwise"
+
+endchoice
+
+config ADNS9800_INVERT_X
+  bool "Invert the X axis of ADNS9800 sensor"
+
+config ADNS9800_INVERT_Y
+  bool "Invert the Y axis of ADNS9800 sensor"
+
+module = ADNS9800
+module-str = ADNS9800
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+
+endif #ADNS9800
