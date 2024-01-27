@@ -921,7 +921,7 @@ static int adns9800_attr_get(const struct device *dev, enum sensor_channel chan,
 {
     const struct avago_config *config = dev->config;
 	int ret = 0;
-    if (chan == ADNS9800_CHAN_DRIVER_CONFIG) { // aka SENSOR_CHAN_PRIV_START
+    if ((int)chan == (int)ADNS9800_CHAN_DRIVER_CONFIG) { // aka SENSOR_CHAN_PRIV_START
         switch (attr) {
         case ADNS9800_ATTR_INTPUT_CHANNEL: // aka SENSOR_ATTR_PRIV_START
             val->val1 = config->input_channel;

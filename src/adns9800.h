@@ -13,6 +13,7 @@
  * @brief Header file for the adns9800 driver.
  */
 
+#include <zephyr/drivers/sensor.h>
 #include "avago.h"
 
 #ifdef __cplusplus
