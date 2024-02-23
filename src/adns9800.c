@@ -963,10 +963,10 @@ static const struct sensor_driver_api adns9800_driver_api = {
                     },                                                                             \
             },                                                                                     \
         .cs_gpio = SPI_CS_GPIOS_DT_SPEC_GET(DT_DRV_INST(n)),                                       \
-        .evt_type = DT_PROP(DT_DRV_INST(0), evt_type),                                             \
-        .x_input_code = DT_PROP(DT_DRV_INST(0), x_input_code),                                     \
-        .y_input_code = DT_PROP(DT_DRV_INST(0), y_input_code),                                     \
-        .input_channel = DT_PROP(DT_DRV_INST(0), input_channel),                                   \
+        .evt_type = DT_PROP(DT_DRV_INST(n), evt_type),                                             \
+        .x_input_code = DT_PROP(DT_DRV_INST(n), x_input_code),                                     \
+        .y_input_code = DT_PROP(DT_DRV_INST(n), y_input_code),                                     \
+        .input_channel = DT_PROP(DT_DRV_INST(n), input_channel),                                   \
     };                                                                                             \
                                                                                                    \
     DEVICE_DT_INST_DEFINE(n, adns9800_init, NULL, &data##n, &config##n, POST_KERNEL,               \
