@@ -43,7 +43,6 @@ struct avago_config {
     uint8_t evt_type;
     uint8_t x_input_code;
     uint8_t y_input_code;
-    uint8_t input_channel;
 };
 
 #ifdef __cplusplus

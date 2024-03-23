@@ -916,30 +916,8 @@ static int adns9800_attr_set(const struct device *dev, enum sensor_channel chan,
     return err;
 }
 
-static int adns9800_attr_get(const struct device *dev, enum sensor_channel chan,
-                             enum sensor_attribute attr, struct sensor_value *val)
-{
-    const struct avago_config *config = dev->config;
-	int ret = 0;
-    if ((int)chan == (int)ADNS9800_CHAN_DRIVER_CONFIG) { // aka SENSOR_CHAN_PRIV_START
-        switch (attr) {
-        case ADNS9800_ATTR_INTPUT_CHANNEL: // aka SENSOR_ATTR_PRIV_START
-            val->val1 = config->input_channel;
-            break;
-        default:
-            LOG_ERR("ADNS9800 attribute not supported.");
-            return -ENOTSUP;
-        }
-    } else {
-        LOG_ERR("ADNS9800 attribute not supported.");
-        return -ENOTSUP;
-    }
-	return ret;
-}
-
 static const struct sensor_driver_api adns9800_driver_api = {
     .attr_set = adns9800_attr_set,
-	.attr_get = adns9800_attr_get,
 };
 
 #define ADNS9800_DEFINE(n)                                                                         \
@@ -966,7 +944,6 @@ static const struct sensor_driver_api adns9800_driver_api = {
         .evt_type = DT_PROP(DT_DRV_INST(n), evt_type),                                             \
         .x_input_code = DT_PROP(DT_DRV_INST(n), x_input_code),                                     \
         .y_input_code = DT_PROP(DT_DRV_INST(n), y_input_code),                                     \
-        .input_channel = DT_PROP(DT_DRV_INST(n), input_channel),                                   \
     };                                                                                             \
                                                                                                    \
     DEVICE_DT_INST_DEFINE(n, adns9800_init, NULL, &data##n, &config##n, POST_KERNEL,               \

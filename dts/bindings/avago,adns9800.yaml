@@ -24,6 +24,3 @@ properties:
   y-input-code:
     type: int
     required: true
-  input-channel:
-    type: int
-    default: 0

@@ -27,17 +27,7 @@ manifest:
     path: config
 ```
 
-Then, edit your `build.yml` to look like this:
-
-```yml
-on: [workflow_dispatch]
-
-jobs:
-  build:
-    uses: petejohanson/zmk/.github/workflows/build-user-config.yml@core/zephyr-3.5-update
-```
-
-Now, update your `board.overlay` adding the necessary bits (update the pins for your board accordingly):
+Update `board.overlay` adding the necessary bits (update the pins for your board accordingly):
 
 ```dts
 &pinctrl {
@@ -80,7 +70,7 @@ Now, update your `board.overlay` adding the necessary bits (update the pins for 
 };
 ```
 
-Now enable the driver config in your `<shield>.config` file (read the Kconfig file to find out all possible options):
+Enable the driver config in your `<shield>.config` file (read the Kconfig file to find out all possible options):
 
 ```conf
 CONFIG_SPI=y

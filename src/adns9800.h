@@ -136,19 +136,8 @@ extern "C" {
 #define ADNS9800_SCROLL_Y_POS 1
 #endif
 
-/** @brief Sensor specific channels of ADNS9800. */
-enum adns9800_channel {
-
-	/** Sensor driver config. */
-	ADNS9800_CHAN_DRIVER_CONFIG = SENSOR_CHAN_PRIV_START,
-
-};
-
 /** @brief Sensor specific attributes of ADNS9800. */
 enum adns9800_attribute {
-
-	/** Sensor input channel. */
-	ADNS9800_ATTR_INTPUT_CHANNEL = SENSOR_ATTR_PRIV_START,
 
 	/** Sensor CPI for both X and Y axes. */
 	ADNS9800_ATTR_CPI,
