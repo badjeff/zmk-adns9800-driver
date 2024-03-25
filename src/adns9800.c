@@ -710,14 +710,16 @@ static int adns9800_report_data(const struct device *dev) {
     x = x;
     y = -y;
 #elif IS_ENABLED(CONFIG_ADNS9800_ORIENTATION_90)
+    int a = x;
     x = y;
-    y = x;
+    y = a;
 #elif IS_ENABLED(CONFIG_ADNS9800_ORIENTATION_180)
     x = -x;
     y = y;
 #elif IS_ENABLED(CONFIG_ADNS9800_ORIENTATION_270)
+    int a = x;
     x = -y;
-    y = -x;
+    y = -a;
 #endif
 
 #if IS_ENABLED(CONFIG_ADNS9800_INVERT_X)
