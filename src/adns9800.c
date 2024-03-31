@@ -62,6 +62,13 @@ static int (*const async_init_fn[ASYNC_INIT_STEP_COUNT])(const struct device *de
     [ASYNC_INIT_STEP_ENABLE_LASER] = adns9800_async_init_enable_laser,
 };
 
+// static void spi_sem_lock(const struct device *dev, bool lock) {
+//     int err;
+//     struct avago_data *data = dev->data;
+//     const struct avago_config *config = dev->config;
+//     LOG_WRN("%s", lock ? "take": "give");
+// }
+
 static int spi_cs_ctrl(const struct device *dev, bool enable) {
     const struct avago_config *config = dev->config;
     int err;
@@ -89,9 +96,11 @@ static int reg_read(const struct device *dev, uint8_t reg, uint8_t *buf) {
 
     __ASSERT_NO_MSG((reg & SPI_WRITE_BIT) == 0);
 
+    // spi_sem_lock(dev, true);
+    
     err = spi_cs_ctrl(dev, true);
     if (err) {
-        return err;
+        goto done;
     }
 
     /* Write register address. */
@@ -101,7 +110,7 @@ static int reg_read(const struct device *dev, uint8_t reg, uint8_t *buf) {
     err = spi_write_dt(&config->bus, &tx);
     if (err) {
         LOG_ERR("Reg read failed on SPI write");
-        return err;
+        goto done;
     }
 
     k_busy_wait(T_SRAD);
@@ -119,19 +128,21 @@ static int reg_read(const struct device *dev, uint8_t reg, uint8_t *buf) {
     err = spi_read_dt(&config->bus, &rx);
     if (err) {
         LOG_ERR("Reg read failed on SPI read");
-        return err;
+        goto done;
     }
 
     err = spi_cs_ctrl(dev, false);
     if (err) {
-        return err;
+        goto done;
     }
 
     k_busy_wait(T_SRX);
 
     data->last_read_burst = false;
 
-    return 0;
+done:
+    // spi_sem_lock(dev, false);
+    return err;
 }
 
 static int reg_write(const struct device *dev, uint8_t reg, uint8_t val) {
@@ -141,9 +152,11 @@ static int reg_write(const struct device *dev, uint8_t reg, uint8_t val) {
 
     __ASSERT_NO_MSG((reg & SPI_WRITE_BIT) == 0);
 
+    // spi_sem_lock(dev, true);
+
     err = spi_cs_ctrl(dev, true);
     if (err) {
-        return err;
+        goto done;
     }
 
     uint8_t buf[] = {SPI_WRITE_BIT | reg, val};
@@ -153,21 +166,23 @@ static int reg_write(const struct device *dev, uint8_t reg, uint8_t val) {
     err = spi_write_dt(&config->bus, &tx);
     if (err) {
         LOG_ERR("Reg write failed on SPI write");
-        return err;
+        goto done;
     }
 
     k_busy_wait(T_SCLK_NCS_WR);
 
     err = spi_cs_ctrl(dev, false);
     if (err) {
-        return err;
+        goto done;
     }
 
     k_busy_wait(T_SWX);
 
     data->last_read_burst = false;
 
-    return 0;
+done:
+    // spi_sem_lock(dev, false);
+    return err;
 }
 
 static int motion_burst_read(const struct device *dev, uint8_t *buf, size_t burst_size) {
@@ -177,19 +192,21 @@ static int motion_burst_read(const struct device *dev, uint8_t *buf, size_t burs
 
     __ASSERT_NO_MSG(burst_size <= ADNS9800_MAX_BURST_SIZE);
 
+    // spi_sem_lock(dev, true);
+
     /* Write any value to motion burst register only if there have been
      * other SPI transmissions with sensor since last burst read.
      */
     if (!data->last_read_burst) {
         err = reg_write(dev, ADNS9800_REG_MOTION_BURST, 0x00);
         if (err) {
-            return err;
+            goto done;
         }
     }
 
     err = spi_cs_ctrl(dev, true);
     if (err) {
-        return err;
+        goto done;
     }
 
     /* Send motion burst address */
@@ -200,7 +217,7 @@ static int motion_burst_read(const struct device *dev, uint8_t *buf, size_t burs
     err = spi_write_dt(&config->bus, &tx);
     if (err) {
         LOG_ERR("Motion burst failed on SPI write");
-        return err;
+        goto done;
     }
 
     k_busy_wait(T_SRAD_MOTBR);
@@ -214,20 +231,22 @@ static int motion_burst_read(const struct device *dev, uint8_t *buf, size_t burs
     err = spi_read_dt(&config->bus, &rx);
     if (err) {
         LOG_ERR("Motion burst failed on SPI read");
-        return err;
+        goto done;
     }
 
     /* Terminate burst */
     err = spi_cs_ctrl(dev, false);
     if (err) {
-        return err;
+        goto done;
     }
 
     k_busy_wait(T_BEXIT);
 
     data->last_read_burst = true;
 
-    return 0;
+done:
+    // spi_sem_lock(dev, false);
+    return err;
 }
 
 static int burst_write(const struct device *dev, uint8_t reg, const uint8_t *buf, size_t size) {
@@ -236,6 +255,8 @@ static int burst_write(const struct device *dev, uint8_t reg, const uint8_t *buf
     const struct avago_config *config = dev->config;
 
     __ASSERT_NO_MSG((reg & SPI_WRITE_BIT) == 0);
+
+    // spi_sem_lock(dev, true);
 
     /* Write address of burst register */
     
@@ -247,13 +268,13 @@ static int burst_write(const struct device *dev, uint8_t reg, const uint8_t *buf
 
     err = spi_cs_ctrl(dev, true);
     if (err) {
-        return err;
+        goto done;
     }
 
     err = spi_write_dt(&config->bus, &tx);
     if (err) {
         LOG_ERR("Burst write failed on SPI write");
-        return err;
+        goto done;
     }
 
     k_busy_wait(T_BRSEP);
@@ -265,7 +286,7 @@ static int burst_write(const struct device *dev, uint8_t reg, const uint8_t *buf
         err = spi_write_dt(&config->bus, &tx);
         if (err) {
             LOG_ERR("Burst write failed on SPI write (data)");
-            return err;
+            break;
         }
 
         k_busy_wait(T_BRSEP);
@@ -275,14 +296,16 @@ static int burst_write(const struct device *dev, uint8_t reg, const uint8_t *buf
     /* Terminate burst mode. */
     err = spi_cs_ctrl(dev, false);
     if (err) {
-        return err;
+        goto done;
     }
 
     k_busy_wait(T_BEXIT);
 
     data->last_read_burst = false;
 
-    return 0;
+done:
+    // spi_sem_lock(dev, false);
+    return err;
 }
 
 static int set_cpi(const struct device *dev, uint32_t cpi) {
@@ -560,9 +583,11 @@ static int adns9800_async_init_power_up(const struct device *dev) {
     // ensure that the SPI port is reset
     // Drive NCS high, and then low to reset the SPI port.
     // - ACTIVE_LOW, set false to high.
+    // spi_sem_lock(dev, true);
     spi_cs_ctrl(dev, false);
     spi_cs_ctrl(dev, true);
     spi_cs_ctrl(dev, false);
+    // spi_sem_lock(dev, false);
 
     err = reg_write(dev, ADNS9800_REG_POWER_UP_RESET, ADNS9800_POWERUP_CMD_RESET);
     if (err) {
@@ -574,8 +599,9 @@ static int adns9800_async_init_power_up(const struct device *dev) {
 
 static int adns9800_async_init_configure(const struct device *dev) {
     int err;
+    const struct avago_config *config = dev->config;
 
-    err = set_cpi(dev, CONFIG_ADNS9800_CPI);
+    err = set_cpi(dev, config->cpi);
 
     if (!err) {
         err = set_downshift_time(dev, ADNS9800_REG_RUN_DOWNSHIFT,
@@ -750,8 +776,8 @@ static int adns9800_report_data(const struct device *dev) {
 #endif
 
     // divide to report value
-    int16_t rx = (int16_t)CLAMP(dx, INT16_MIN, INT16_MAX) / CONFIG_ADNS9800_CPI_DIVIDOR;
-    int16_t ry = (int16_t)CLAMP(dy, INT16_MIN, INT16_MAX) / CONFIG_ADNS9800_CPI_DIVIDOR;
+    int16_t rx = (int16_t)CLAMP(dx, INT16_MIN, INT16_MAX);
+    int16_t ry = (int16_t)CLAMP(dy, INT16_MIN, INT16_MAX);
     bool have_x = rx != 0;
     bool have_y = ry != 0;
 
@@ -912,7 +938,7 @@ static int adns9800_attr_set(const struct device *dev, enum sensor_channel chan,
 
     default:
         LOG_ERR("Unknown attribute");
-        return -ENOTSUP;
+        err = -ENOTSUP;
     }
 
     return err;
@@ -926,6 +952,7 @@ static const struct sensor_driver_api adns9800_driver_api = {
     static struct avago_data data##n;                                                              \
     static const struct avago_config config##n = {                                                 \
         .irq_gpio = GPIO_DT_SPEC_INST_GET(n, irq_gpios),                                           \
+        .cpi = DT_PROP(DT_DRV_INST(n), cpi),                                                       \
         .bus =                                                                                     \
             {                                                                                      \
                 .bus = DEVICE_DT_GET(DT_INST_BUS(n)),                                              \

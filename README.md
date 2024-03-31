@@ -1,12 +1,10 @@
-ADNS9800 driver implementation for ZMK with at least Zephyr 3.5
+ADNS9800 driver implementation for ZMK
 
 This work is based on [ufan's zmk pixart sensor drivers](https://github.com/ufan/zmk/tree/support-trackpad) and [inorichi's zmk-pmw3610-driver](https://github.com/inorichi/zmk-pmw3610-driver).
 
 ## Installation
 
-Only GitHub actions builds are covered here. Local builds are different for each user, therefore it's not possible to cover all cases.
-
-Include this project on your ZMK's west manifest in `config/west.yml`:
+Include this project on ZMK's west manifest in `config/west.yml`:
 
 ```yml
 manifest:
@@ -63,6 +61,7 @@ Update `board.overlay` adding the necessary bits (update the pins for your board
         reg = <0>;
         spi-max-frequency = <4000000>;
         irq-gpios = <&gpio0 6 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+        cpi = <600>;
         evt-type = <INPUT_EV_REL>;
         x-input-code = <INPUT_REL_X>;
         y-input-code = <INPUT_REL_Y>;
@@ -70,7 +69,7 @@ Update `board.overlay` adding the necessary bits (update the pins for your board
 };
 ```
 
-Enable the driver config in your `<shield>.config` file (read the Kconfig file to find out all possible options):
+Enable the driver config in `<shield>.config` file (read the Kconfig file to find out all possible options):
 
 ```conf
 CONFIG_SPI=y
@@ -78,8 +77,6 @@ CONFIG_INPUT=y
 CONFIG_ZMK_MOUSE=y
 CONFIG_ADNS9800=y
 # CONFIG_ADNS9800_LOG_LEVEL_DBG=y
-# CONFIG_ADNS9800_CPI=600
-# CONFIG_ADNS9800_CPI_DIVIDOR=1
 # CONFIG_ADNS9800_REPORT_INTERVAL_MIN=22
 # CONFIG_ADNS9800_ORIENTATION_90=y
 # CONFIG_ADNS9800_ORIENTATION_180=y

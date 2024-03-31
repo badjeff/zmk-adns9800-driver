@@ -13,20 +13,6 @@ menuconfig ADNS9800
 
 if ADNS9800
 
-config ADNS9800_CPI
-	int "ADNS9800's default CPI"
-	default 600
-	range 50 8200
-	help
-	  Default CPI value.
-
-config ADNS9800_CPI_DIVIDOR
-	int "ADNS9800's default CPI dividor"
-	default 1
-	range 1 12
-	help
-	  Default CPI dividor value.
-
 config ADNS9800_REPORT_INTERVAL_MIN
 	int "ADNS9800's default minimum report rate"
 	default 16
