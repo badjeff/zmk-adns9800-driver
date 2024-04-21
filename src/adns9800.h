@@ -120,22 +120,6 @@ extern "C" {
 #define ADNS9800_SVALUE_TO_TIME(svalue) ((uint32_t)(svalue).val1)
 #define ADNS9800_SVALUE_TO_BOOL(svalue) ((svalue).val1 != 0)
 
-#ifdef CONFIG_ADNS9800_INVERT_SCROLL_X
-#define ADNS9800_SCROLL_X_NEG 1
-#define ADNS9800_SCROLL_X_POS -1
-#else
-#define ADNS9800_SCROLL_X_NEG -1
-#define ADNS9800_SCROLL_X_POS 1
-#endif
-
-#ifdef CONFIG_ADNS9800_INVERT_SCROLL_Y
-#define ADNS9800_SCROLL_Y_NEG 1
-#define ADNS9800_SCROLL_Y_POS -1
-#else
-#define ADNS9800_SCROLL_Y_NEG -1
-#define ADNS9800_SCROLL_Y_POS 1
-#endif
-
 /** @brief Sensor specific attributes of ADNS9800. */
 enum adns9800_attribute {
 

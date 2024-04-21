@@ -565,9 +565,6 @@ static void set_interrupt(const struct device *dev, const bool en) {
 }
 
 static int adns9800_async_init_power_up(const struct device *dev) {
-    /* Reset sensor */
-    int err;
-
     // struct avago_data *data = dev->data;
     // const struct avago_config *config = dev->config;
     // while (1) {
@@ -589,12 +586,7 @@ static int adns9800_async_init_power_up(const struct device *dev) {
     spi_cs_ctrl(dev, false);
     // spi_sem_lock(dev, false);
 
-    err = reg_write(dev, ADNS9800_REG_POWER_UP_RESET, ADNS9800_POWERUP_CMD_RESET);
-    if (err) {
-        return err;
-    }
-
-    return err;
+    return reg_write(dev, ADNS9800_REG_POWER_UP_RESET, ADNS9800_POWERUP_CMD_RESET);
 }
 
 static int adns9800_async_init_configure(const struct device *dev) {
@@ -619,15 +611,18 @@ static int adns9800_async_init_configure(const struct device *dev) {
     }
 
     if (!err) {
-        err = set_sample_time(dev, ADNS9800_REG_REST1_RATE, CONFIG_ADNS9800_REST1_RATE_MS);
+        err = set_sample_time(dev, ADNS9800_REG_REST1_RATE,
+                              CONFIG_ADNS9800_REST1_RATE_MS);
     }
 
     if (!err) {
-        err = set_sample_time(dev, ADNS9800_REG_REST2_RATE, CONFIG_ADNS9800_REST2_RATE_MS);
+        err = set_sample_time(dev, ADNS9800_REG_REST2_RATE,
+                              CONFIG_ADNS9800_REST2_RATE_MS);
     }
 
     if (!err) {
-        err = set_sample_time(dev, ADNS9800_REG_REST3_RATE, CONFIG_ADNS9800_REST3_RATE_MS);
+        err = set_sample_time(dev, ADNS9800_REG_REST3_RATE,
+                              CONFIG_ADNS9800_REST3_RATE_MS);
     }
 
     if (!err) {
@@ -703,8 +698,6 @@ static int adns9800_report_data(const struct device *dev) {
 
     static int64_t dx = 0;
     static int64_t dy = 0;
-    // static int16_t dsx = 0;
-    // static int16_t dsy = 0;
 
 #if CONFIG_ADNS9800_REPORT_INTERVAL_MIN > 0
     static int64_t last_smp_time = 0;
