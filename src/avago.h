@@ -20,10 +20,6 @@ extern "C" {
 struct avago_data {
     const struct device          *dev;
 
-    int16_t                      x;
-    int16_t                      y;
-    uint32_t                     curr_cpi;
-
     struct gpio_callback         irq_gpio_cb; // motion pin irq callback
     struct k_work                trigger_work; // realtrigger job
 

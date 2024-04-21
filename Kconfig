@@ -13,6 +13,15 @@ menuconfig ADNS9800
 
 if ADNS9800
 
+config ADNS9800_SWAP_XY
+  bool "Swap the X/Y axis of ADNS9800 sensor"
+
+config ADNS9800_INVERT_X
+  bool "Invert the X axis of ADNS9800 sensor"
+
+config ADNS9800_INVERT_Y
+  bool "Invert the Y axis of ADNS9800 sensor"
+
 config ADNS9800_REPORT_INTERVAL_MIN
 	int "ADNS9800's default minimum report rate"
 	default 16
@@ -62,30 +71,6 @@ config ADNS9800_REST3_RATE_MS
 	default 100
 	help
 	  Default REST3 mode sample rate in milliseconds.
-
-choice
-	prompt "Select ADNS9800 sensor orientation"
-	default ADNS9800_ORIENTATION_0
-
-config ADNS9800_ORIENTATION_0
-	bool "ADNS9800 not rotated"
-
-config ADNS9800_ORIENTATION_90
-	bool "ADNS9800 rotated 90 deg clockwise"
-
-config ADNS9800_ORIENTATION_180
-	bool "ADNS9800 rotated 180 deg clockwise"
-
-config ADNS9800_ORIENTATION_270
-	bool "ADNS9800 rotated 270 deg clockwise"
-
-endchoice
-
-config ADNS9800_INVERT_X
-  bool "Invert the X axis of ADNS9800 sensor"
-
-config ADNS9800_INVERT_Y
-  bool "Invert the Y axis of ADNS9800 sensor"
 
 module = ADNS9800
 module-str = ADNS9800

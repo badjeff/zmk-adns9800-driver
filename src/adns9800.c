@@ -330,9 +330,6 @@ static int set_cpi(const struct device *dev, uint32_t cpi) {
         LOG_ERR("Failed to change CPI");
     }
 
-    struct avago_data *dev_data = dev->data;
-    dev_data->curr_cpi = cpi;
-
     return err;
 }
 
@@ -725,22 +722,11 @@ static int adns9800_report_data(const struct device *dev) {
     //     buf[ADNS9800_DY_POS+1], buf[ADNS9800_DY_POS],
     //     x, y);
 
-#if IS_ENABLED(CONFIG_ADNS9800_ORIENTATION_0)
-    x = x;
-    y = -y;
-#elif IS_ENABLED(CONFIG_ADNS9800_ORIENTATION_90)
-    int a = x;
+#if IS_ENABLED(CONFIG_ADNS9800_SWAP_XY)
+    int16_t a = x;
     x = y;
     y = a;
-#elif IS_ENABLED(CONFIG_ADNS9800_ORIENTATION_180)
-    x = -x;
-    y = y;
-#elif IS_ENABLED(CONFIG_ADNS9800_ORIENTATION_270)
-    int a = x;
-    x = -y;
-    y = -a;
 #endif
-
 #if IS_ENABLED(CONFIG_ADNS9800_INVERT_X)
     x = -x;
 #endif
@@ -786,10 +772,6 @@ static int adns9800_report_data(const struct device *dev) {
         if (have_y) {
             input_report(dev, config->evt_type, config->y_input_code, ry, true, K_NO_WAIT);
         }
-
-        // backward computable to adns9800_sample_fetch
-        data->x = x;
-        data->y = y;
     }
 
     return err;
