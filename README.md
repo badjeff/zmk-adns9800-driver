@@ -74,7 +74,7 @@ Enable the driver config in `<shield>.config` file (read the Kconfig file to fin
 ```conf
 CONFIG_SPI=y
 CONFIG_INPUT=y
-CONFIG_ZMK_MOUSE=y
+CONFIG_ZMK_POINTING=y
 CONFIG_ADNS9800=y
 # CONFIG_ADNS9800_SWAP_XY=y
 # CONFIG_ADNS9800_INVERT_X=y
