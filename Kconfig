@@ -8,10 +8,16 @@
 menuconfig ADNS9800
 	bool "ADNS9800 mouse optical sensor"
   select SPI
+  depends on INPUT
+  depends on DT_HAS_AVAGO_ADNS9800_ENABLED
 	help
 	  Enable ADNS9800 mouse optical sensor.
 
 if ADNS9800
+
+config INPUT_ADNS9800_INIT_PRIORITY
+    int "ADNS9800 initialization priority"
+    default INPUT_INIT_PRIORITY
 
 config ADNS9800_SWAP_XY
   bool "Swap the X/Y axis of ADNS9800 sensor"
@@ -21,6 +27,13 @@ config ADNS9800_INVERT_X
 
 config ADNS9800_INVERT_Y
   bool "Invert the Y axis of ADNS9800 sensor"
+
+config ADNS9800_INIT_POWER_UP_EXTRA_DELAY_MS
+  int "Extra power up init delay (ms)"
+  default 0
+  help
+    Default minimum init power up delay is 10ms.
+    Use this config to postpone init power up sequence if needs longer bootup time.
 
 config ADNS9800_REPORT_INTERVAL_MIN
 	int "ADNS9800's default minimum report rate"

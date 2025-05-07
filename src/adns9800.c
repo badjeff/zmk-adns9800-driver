@@ -38,7 +38,7 @@ enum async_init_step {
 
 // delay (ms) in between steps
 static const int32_t async_init_delay[ASYNC_INIT_STEP_COUNT] = {
-    [ASYNC_INIT_STEP_POWER_UP] = 1, //7*1000, // 8 sec
+    [ASYNC_INIT_STEP_POWER_UP] = 10 + CONFIG_ADNS9800_INIT_POWER_UP_EXTRA_DELAY_MS,
     [ASYNC_INIT_STEP_FW_LOAD_START] = 50,    // required in spec
     [ASYNC_INIT_STEP_FW_LOAD_CONTINUE] = 10, // required in spec
     [ASYNC_INIT_STEP_FW_LOAD_VERIFY] = 10,
@@ -62,13 +62,6 @@ static int (*const async_init_fn[ASYNC_INIT_STEP_COUNT])(const struct device *de
     [ASYNC_INIT_STEP_ENABLE_LASER] = adns9800_async_init_enable_laser,
 };
 
-// static void spi_sem_lock(const struct device *dev, bool lock) {
-//     int err;
-//     struct avago_data *data = dev->data;
-//     const struct avago_config *config = dev->config;
-//     LOG_WRN("%s", lock ? "take": "give");
-// }
-
 static int spi_cs_ctrl(const struct device *dev, bool enable) {
     const struct avago_config *config = dev->config;
     int err;
@@ -89,99 +82,80 @@ static int spi_cs_ctrl(const struct device *dev, bool enable) {
     return err;
 }
 
-static int reg_read(const struct device *dev, uint8_t reg, uint8_t *buf) {
+static int adns9800_read_reg(const struct device *dev, uint8_t reg, uint8_t *buf) {
     int err;
     struct avago_data *data = dev->data;
     const struct avago_config *config = dev->config;
 
     __ASSERT_NO_MSG((reg & SPI_WRITE_BIT) == 0);
 
-    // spi_sem_lock(dev, true);
-    
     err = spi_cs_ctrl(dev, true);
     if (err) {
-        goto done;
+        return err;
     }
 
     /* Write register address. */
-    const struct spi_buf tx_buf = {.buf = &reg, .len = 1};
-    const struct spi_buf_set tx = {.buffers = &tx_buf, .count = 1};
-
-    err = spi_write_dt(&config->bus, &tx);
+    const struct spi_buf tx_buf = { .buf = &reg, .len = 1 };
+    const struct spi_buf_set tx = { .buffers = &tx_buf, .count = 1 };
+    err = spi_write_dt(&config->spi, &tx);
     if (err) {
         LOG_ERR("Reg read failed on SPI write");
-        goto done;
+        return err;
     }
 
     k_busy_wait(T_SRAD);
 
     /* Read register value. */
-    struct spi_buf rx_buf = {
-        .buf = buf,
-        .len = 1,
-    };
-    const struct spi_buf_set rx = {
-        .buffers = &rx_buf,
-        .count = 1,
-    };
-
-    err = spi_read_dt(&config->bus, &rx);
+    struct spi_buf rx_buf = { .buf = buf, .len = 1 };
+    const struct spi_buf_set rx = { .buffers = &rx_buf, .count = 1 };
+    err = spi_read_dt(&config->spi, &rx);
     if (err) {
         LOG_ERR("Reg read failed on SPI read");
-        goto done;
+        return err;
     }
 
     err = spi_cs_ctrl(dev, false);
     if (err) {
-        goto done;
+        return err;
     }
 
     k_busy_wait(T_SRX);
 
     data->last_read_burst = false;
-
-done:
-    // spi_sem_lock(dev, false);
     return err;
 }
 
-static int reg_write(const struct device *dev, uint8_t reg, uint8_t val) {
+static int adns9800_write_reg(const struct device *dev, uint8_t reg, uint8_t val) {
     int err;
     struct avago_data *data = dev->data;
     const struct avago_config *config = dev->config;
 
     __ASSERT_NO_MSG((reg & SPI_WRITE_BIT) == 0);
 
-    // spi_sem_lock(dev, true);
-
     err = spi_cs_ctrl(dev, true);
     if (err) {
-        goto done;
+        return err;
     }
 
     uint8_t buf[] = {SPI_WRITE_BIT | reg, val};
-    const struct spi_buf tx_buf = {.buf = buf, .len = ARRAY_SIZE(buf)};
-    const struct spi_buf_set tx = {.buffers = &tx_buf, .count = 1};
-
-    err = spi_write_dt(&config->bus, &tx);
+    const struct spi_buf tx_buf = { .buf = buf, .len = ARRAY_SIZE(buf) };
+    const struct spi_buf_set tx = { .buffers = &tx_buf, .count = 1 };
+    err = spi_write_dt(&config->spi, &tx);
     if (err) {
         LOG_ERR("Reg write failed on SPI write");
-        goto done;
+        return err;
     }
 
     k_busy_wait(T_SCLK_NCS_WR);
 
     err = spi_cs_ctrl(dev, false);
     if (err) {
-        goto done;
+        return err;
     }
 
     k_busy_wait(T_SWX);
 
     data->last_read_burst = false;
-
-done:
-    // spi_sem_lock(dev, false);
     return err;
 }
 
@@ -192,21 +166,19 @@ static int motion_burst_read(const struct device *dev, uint8_t *buf, size_t burs
 
     __ASSERT_NO_MSG(burst_size <= ADNS9800_MAX_BURST_SIZE);
 
-    // spi_sem_lock(dev, true);
-
     /* Write any value to motion burst register only if there have been
      * other SPI transmissions with sensor since last burst read.
      */
     if (!data->last_read_burst) {
-        err = reg_write(dev, ADNS9800_REG_MOTION_BURST, 0x00);
+        err = adns9800_write_reg(dev, ADNS9800_REG_MOTION_BURST, 0x00);
         if (err) {
-            goto done;
+            return err;
         }
     }
 
     err = spi_cs_ctrl(dev, true);
     if (err) {
-        goto done;
+        return err;
     }
 
     /* Send motion burst address */
@@ -214,13 +186,13 @@ static int motion_burst_read(const struct device *dev, uint8_t *buf, size_t burs
     const struct spi_buf tx_buf = {.buf = reg_buf, .len = ARRAY_SIZE(reg_buf)};
     const struct spi_buf_set tx = {.buffers = &tx_buf, .count = 1};
 
-    err = spi_write_dt(&config->bus, &tx);
+    err = spi_write_dt(&config->spi, &tx);
     if (err) {
         LOG_ERR("Motion burst failed on SPI write");
-        goto done;
+        return err;
     }
 
-    k_busy_wait(T_SRAD_MOTBR);
+    k_busy_wait(T_SRAD_MOTBR); /* essential delay on ADNS9800 */
 
     const struct spi_buf rx_buf = {
         .buf = buf,
@@ -228,24 +200,21 @@ static int motion_burst_read(const struct device *dev, uint8_t *buf, size_t burs
     };
     const struct spi_buf_set rx = {.buffers = &rx_buf, .count = 1};
 
-    err = spi_read_dt(&config->bus, &rx);
+    err = spi_read_dt(&config->spi, &rx);
     if (err) {
         LOG_ERR("Motion burst failed on SPI read");
-        goto done;
+        return err;
     }
 
     /* Terminate burst */
     err = spi_cs_ctrl(dev, false);
     if (err) {
-        goto done;
+        return err;
     }
 
     k_busy_wait(T_BEXIT);
 
     data->last_read_burst = true;
-
-done:
-    // spi_sem_lock(dev, false);
     return err;
 }
 
@@ -255,8 +224,6 @@ static int burst_write(const struct device *dev, uint8_t reg, const uint8_t *buf
     const struct avago_config *config = dev->config;
 
     __ASSERT_NO_MSG((reg & SPI_WRITE_BIT) == 0);
-
-    // spi_sem_lock(dev, true);
 
     /* Write address of burst register */
     
@@ -268,22 +235,22 @@ static int burst_write(const struct device *dev, uint8_t reg, const uint8_t *buf
 
     err = spi_cs_ctrl(dev, true);
     if (err) {
-        goto done;
+        return err;
     }
 
-    err = spi_write_dt(&config->bus, &tx);
+    err = spi_write_dt(&config->spi, &tx);
     if (err) {
         LOG_ERR("Burst write failed on SPI write");
-        goto done;
+        return err;
     }
 
-    k_busy_wait(T_BRSEP);
+    k_busy_wait(T_BRSEP); /* essential delay on ADNS9800 */
 
     /* Write data */
     for (size_t i = 0; i < size; i++) {
         write_buf = buf[i];
 
-        err = spi_write_dt(&config->bus, &tx);
+        err = spi_write_dt(&config->spi, &tx);
         if (err) {
             LOG_ERR("Burst write failed on SPI write (data)");
             break;
@@ -296,15 +263,12 @@ static int burst_write(const struct device *dev, uint8_t reg, const uint8_t *buf
     /* Terminate burst mode. */
     err = spi_cs_ctrl(dev, false);
     if (err) {
-        goto done;
+        return err;
     }
 
     k_busy_wait(T_BEXIT);
 
     data->last_read_burst = false;
-
-done:
-    // spi_sem_lock(dev, false);
     return err;
 }
 
@@ -325,7 +289,7 @@ static int set_cpi(const struct device *dev, uint32_t cpi) {
 
     LOG_INF("Setting CPI to %u (reg value 0x%x)", cpi, value);
 
-    int err = reg_write(dev, ADNS9800_REG_CONFIG1, value);
+    int err = adns9800_write_reg(dev, ADNS9800_REG_CONFIG1, value);
     if (err) {
         LOG_ERR("Failed to change CPI");
     }
@@ -387,7 +351,7 @@ static int set_downshift_time(const struct device *dev, uint8_t reg_addr, uint32
 
     LOG_INF("Set downshift time to %u ms (reg value 0x%x)", time, value);
 
-    int err = reg_write(dev, reg_addr, value);
+    int err = adns9800_write_reg(dev, reg_addr, value);
     if (err) {
         LOG_ERR("Failed to change downshift time");
     }
@@ -413,7 +377,7 @@ static int set_sample_time(const struct device *dev, uint8_t reg_addr, uint32_t 
     /* The sample time is (reg_value + 1) * 10ms. */
     uint8_t value = (sample_time / 10) - 1;
 
-    int err = reg_write(dev, reg_addr, value);
+    int err = adns9800_write_reg(dev, reg_addr, value);
     if (err) {
         LOG_ERR("Failed to change sample time");
     }
@@ -423,7 +387,7 @@ static int set_sample_time(const struct device *dev, uint8_t reg_addr, uint32_t 
 
 static int set_rest_modes(const struct device *dev, uint8_t reg_addr, bool enable) {
     uint8_t value;
-    int err = reg_read(dev, reg_addr, &value);
+    int err = adns9800_read_reg(dev, reg_addr, &value);
 
     if (err) {
         LOG_ERR("Failed to read Config2 register");
@@ -433,7 +397,7 @@ static int set_rest_modes(const struct device *dev, uint8_t reg_addr, bool enabl
     WRITE_BIT(value, ADNS9800_REST_EN_POS, enable);
 
     LOG_INF("%sable rest modes", (enable) ? ("En") : ("Dis"));
-    err = reg_write(dev, reg_addr, value);
+    err = adns9800_write_reg(dev, reg_addr, value);
 
     if (err) {
         LOG_ERR("Failed to set rest mode");
@@ -448,7 +412,7 @@ static int adns9800_async_init_fw_load_start(const struct device *dev) {
     /* Read from registers 0x02-0x06 regardless of the motion pin state. */
     for (uint8_t reg = 0x02; (reg <= 0x06) && !err; reg++) {
         uint8_t buf[1];
-        err = reg_read(dev, reg, buf);
+        err = adns9800_read_reg(dev, reg, buf);
     }
 
     if (err) {
@@ -460,7 +424,7 @@ static int adns9800_async_init_fw_load_start(const struct device *dev) {
 
     // verify product id before upload fw
     uint8_t product_id;
-    err = reg_read(dev, ADNS9800_REG_PRODUCT_ID, &product_id);
+    err = adns9800_read_reg(dev, ADNS9800_REG_PRODUCT_ID, &product_id);
     if (err) {
         LOG_ERR("Cannot obtain product id");
         return err;
@@ -474,14 +438,14 @@ static int adns9800_async_init_fw_load_start(const struct device *dev) {
 
     // set the configuration_IV register in 3k firmware mode
     // bit 1 = 1 for 3k mode, other bits are reserved 
-    err = reg_write(dev, ADNS9800_REG_CONFIG4, 0x02);
+    err = adns9800_write_reg(dev, ADNS9800_REG_CONFIG4, 0x02);
     if (err) {
         LOG_ERR("Cannot set the configuration_IV register in 3k firmware mode");
         return err;
     }
 
     /* Write 0x1D in SROM_enable register to initialize the operation */
-    err = reg_write(dev, ADNS9800_REG_SROM_ENABLE, 0x1D);
+    err = adns9800_write_reg(dev, ADNS9800_REG_SROM_ENABLE, 0x1D);
     if (err) {
         LOG_ERR("Cannot initialize SROM");
         return err;
@@ -496,7 +460,7 @@ static int adns9800_async_init_fw_load_continue(const struct device *dev) {
     LOG_INF("Uploading optical sensor firmware...");
 
     /* Write 0x18 to SROM_enable to start SROM download */
-    err = reg_write(dev, ADNS9800_REG_SROM_ENABLE, 0x18);
+    err = adns9800_write_reg(dev, ADNS9800_REG_SROM_ENABLE, 0x18);
     if (err) {
         LOG_ERR("Cannot start SROM download");
         return err;
@@ -524,7 +488,7 @@ static int adns9800_async_init_fw_load_verify(const struct device *dev) {
     int err;
 
     uint8_t product_id;
-    err = reg_read(dev, ADNS9800_REG_PRODUCT_ID, &product_id);
+    err = adns9800_read_reg(dev, ADNS9800_REG_PRODUCT_ID, &product_id);
     if (err) {
         LOG_ERR("Cannot obtain product id");
         return err;
@@ -532,7 +496,7 @@ static int adns9800_async_init_fw_load_verify(const struct device *dev) {
     LOG_DBG("Optical chip product ID: 0x%x", product_id);
 
     uint8_t fw_id;
-    err = reg_read(dev, ADNS9800_REG_SROM_ID, &fw_id);
+    err = adns9800_read_reg(dev, ADNS9800_REG_SROM_ID, &fw_id);
     if (err) {
         LOG_ERR("Cannot obtain firmware id");
         return err;
@@ -577,13 +541,11 @@ static int adns9800_async_init_power_up(const struct device *dev) {
     // ensure that the SPI port is reset
     // Drive NCS high, and then low to reset the SPI port.
     // - ACTIVE_LOW, set false to high.
-    // spi_sem_lock(dev, true);
     spi_cs_ctrl(dev, false);
     spi_cs_ctrl(dev, true);
     spi_cs_ctrl(dev, false);
-    // spi_sem_lock(dev, false);
 
-    return reg_write(dev, ADNS9800_REG_POWER_UP_RESET, ADNS9800_POWERUP_CMD_RESET);
+    return adns9800_write_reg(dev, ADNS9800_REG_POWER_UP_RESET, ADNS9800_POWERUP_CMD_RESET);
 }
 
 static int adns9800_async_init_configure(const struct device *dev) {
@@ -643,7 +605,7 @@ static int adns9800_async_init_enable_laser(const struct device *dev) {
     // change the reserved bytes (like by writing 0x00...) it would not work.
 
     uint8_t laser_ctrl0;
-    err = reg_read(dev, ADNS9800_REG_LASER_CTRL0, &laser_ctrl0);
+    err = adns9800_read_reg(dev, ADNS9800_REG_LASER_CTRL0, &laser_ctrl0);
     if (err) {
         LOG_ERR("Cannot read LASER_CTRL0");
         return err;
@@ -651,7 +613,7 @@ static int adns9800_async_init_enable_laser(const struct device *dev) {
 
     LOG_INF("Setting LASER to %u (reg value 0x%x)", laser_ctrl0, laser_ctrl0 & 0xf0);
 
-    err = reg_write(dev, ADNS9800_REG_LASER_CTRL0, laser_ctrl0 & 0xf0 );  
+    err = adns9800_write_reg(dev, ADNS9800_REG_LASER_CTRL0, laser_ctrl0 & 0xf0 );  
     if (err) {
         LOG_ERR("Cannot configure LASER_CTRL0");
         return err;
@@ -923,34 +885,27 @@ static const struct sensor_driver_api adns9800_driver_api = {
     .attr_set = adns9800_attr_set,
 };
 
-#define ADNS9800_DEFINE(n)                                                                         \
+#define ASND9800_SPI_MODE (SPI_WORD_SET(8) | SPI_MODE_CPOL | SPI_MODE_CPHA | SPI_TRANSFER_MSB)
+
+#define ASND9800_DEFINE(n)                                                                         \
     static struct avago_data data##n;                                                              \
     static const struct avago_config config##n = {                                                 \
+        .spi = {                                                                                   \
+            .bus = DEVICE_DT_GET(DT_INST_BUS(n)),                                                  \
+            .config = {                                                                            \
+                .frequency = DT_INST_PROP(n, spi_max_frequency),                                   \
+                .operation = ASND9800_SPI_MODE,                                                    \
+                .slave = DT_INST_REG_ADDR(n),                                                      \
+             },                                                                                    \
+        },                                                                                         \
+        .cs_gpio = SPI_CS_GPIOS_DT_SPEC_GET(DT_DRV_INST(n)),                                       \
         .irq_gpio = GPIO_DT_SPEC_INST_GET(n, irq_gpios),                                           \
         .cpi = DT_PROP(DT_DRV_INST(n), cpi),                                                       \
-        .bus =                                                                                     \
-            {                                                                                      \
-                .bus = DEVICE_DT_GET(DT_INST_BUS(n)),                                              \
-                .config =                                                                          \
-                    {                                                                              \
-                        .frequency = DT_INST_PROP(n, spi_max_frequency),                           \
-                        .operation =                                                               \
-                            ( \
-                              SPI_WORD_SET(8) \
-                            | SPI_TRANSFER_MSB \
-                            | SPI_MODE_CPOL \
-                            | SPI_MODE_CPHA \
-                            ), \
-                        .slave = DT_INST_REG_ADDR(n),                                              \
-                    },                                                                             \
-            },                                                                                     \
-        .cs_gpio = SPI_CS_GPIOS_DT_SPEC_GET(DT_DRV_INST(n)),                                       \
         .evt_type = DT_PROP(DT_DRV_INST(n), evt_type),                                             \
         .x_input_code = DT_PROP(DT_DRV_INST(n), x_input_code),                                     \
         .y_input_code = DT_PROP(DT_DRV_INST(n), y_input_code),                                     \
     };                                                                                             \
-                                                                                                   \
     DEVICE_DT_INST_DEFINE(n, adns9800_init, NULL, &data##n, &config##n, POST_KERNEL,               \
-                          CONFIG_SENSOR_INIT_PRIORITY, &adns9800_driver_api);
+                          CONFIG_INPUT_ADNS9800_INIT_PRIORITY, &adns9800_driver_api);
 
-DT_INST_FOREACH_STATUS_OKAY(ADNS9800_DEFINE)
+DT_INST_FOREACH_STATUS_OKAY(ASND9800_DEFINE)
