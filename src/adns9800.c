@@ -664,7 +664,7 @@ static int adns9800_report_data(const struct device *dev) {
     int64_t now = k_uptime_get();
 #endif
 
-    int err = motion_burst_read(dev, buf, sizeof(buf));
+    int err = motion_burst_read(dev, buf, ADNS9800_BURST_SIZE);
     if (err) {
         return err;
     }
@@ -678,11 +678,12 @@ static int adns9800_report_data(const struct device *dev) {
         buf[ADNS9800_DX_POS+1], buf[ADNS9800_DX_POS],
         buf[ADNS9800_DY_POS+1], buf[ADNS9800_DY_POS],
         x, y, squal);
+#else
+    LOG_DBG("motion_burst_read, X: 0x%x 0x%x, Y: 0x%x 0x%x, %d, %d", 
+        buf[ADNS9800_DX_POS+1], buf[ADNS9800_DX_POS],
+        buf[ADNS9800_DY_POS+1], buf[ADNS9800_DY_POS],
+        x, y);
 #endif
-    // LOG_DBG("motion_burst_read, X: 0x%x 0x%x, Y: 0x%x 0x%x, %d, %d", 
-    //     buf[ADNS9800_DX_POS+1], buf[ADNS9800_DX_POS],
-    //     buf[ADNS9800_DY_POS+1], buf[ADNS9800_DY_POS],
-    //     x, y);
 
 #if IS_ENABLED(CONFIG_ADNS9800_SWAP_XY)
     int16_t a = x;
