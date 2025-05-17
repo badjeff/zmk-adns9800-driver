@@ -1,4 +1,4 @@
-ADNS9800 driver implementation for ZMK
+# ADNS9800 driver implementation for ZMK
 
 This work is based on [ufan's zmk pixart sensor drivers](https://github.com/ufan/zmk/tree/support-trackpad) and [inorichi's zmk-pmw3610-driver](https://github.com/inorichi/zmk-pmw3610-driver).
 
