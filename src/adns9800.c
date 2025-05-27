@@ -668,22 +668,24 @@ static int adns9800_report_data(const struct device *dev) {
     if (err) {
         return err;
     }
+    // LOG_HEXDUMP_DBG(buf, ADNS9800_BURST_SIZE, "buf");
 
     int16_t x = ((int16_t)sys_get_le16(&buf[ADNS9800_DX_POS]));
     int16_t y = ((int16_t)sys_get_le16(&buf[ADNS9800_DY_POS]));
+    LOG_DBG("x/y: %d/%d", x, y);
 
-#ifdef ADNS9800_SQUAL_POS
-    int8_t squal = buf[ADNS9800_SQUAL_POS];
-    LOG_DBG("motion_burst_read, X: 0x%x 0x%x, Y: 0x%x 0x%x, %d, %d, %d", 
-        buf[ADNS9800_DX_POS+1], buf[ADNS9800_DX_POS],
-        buf[ADNS9800_DY_POS+1], buf[ADNS9800_DY_POS],
-        x, y, squal);
-#else
-    LOG_DBG("motion_burst_read, X: 0x%x 0x%x, Y: 0x%x 0x%x, %d, %d", 
-        buf[ADNS9800_DX_POS+1], buf[ADNS9800_DX_POS],
-        buf[ADNS9800_DY_POS+1], buf[ADNS9800_DY_POS],
-        x, y);
-#endif
+// #ifdef ADNS9800_SQUAL_POS
+//     int8_t squal = buf[ADNS9800_SQUAL_POS];
+//     LOG_DBG("motion_burst_read, X: 0x%x 0x%x, Y: 0x%x 0x%x, %d, %d, %d", 
+//         buf[ADNS9800_DX_POS+1], buf[ADNS9800_DX_POS],
+//         buf[ADNS9800_DY_POS+1], buf[ADNS9800_DY_POS],
+//         x, y, squal);
+// #else
+//     LOG_DBG("motion_burst_read, X: 0x%x 0x%x, Y: 0x%x 0x%x, %d, %d", 
+//         buf[ADNS9800_DX_POS+1], buf[ADNS9800_DX_POS],
+//         buf[ADNS9800_DY_POS+1], buf[ADNS9800_DY_POS],
+//         x, y);
+// #endif
 
 #if IS_ENABLED(CONFIG_ADNS9800_SWAP_XY)
     int16_t a = x;
