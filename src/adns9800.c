@@ -67,7 +67,7 @@ static int spi_cs_ctrl(const struct device *dev, bool enable) {
     int err;
 
     if (!enable) {
-        k_busy_wait(T_NCS_SCLK);
+        k_usleep(T_NCS_SCLK);
     }
 
     err = gpio_pin_set_dt(&config->cs_gpio, (int)enable);
@@ -76,7 +76,7 @@ static int spi_cs_ctrl(const struct device *dev, bool enable) {
     }
 
     if (enable) {
-        k_busy_wait(T_NCS_SCLK);
+        k_usleep(T_NCS_SCLK);
     }
 
     return err;
@@ -103,7 +103,7 @@ static int adns9800_read_reg(const struct device *dev, uint8_t reg, uint8_t *buf
         return err;
     }
 
-    k_busy_wait(T_SRAD);
+    k_usleep(T_SRAD);
 
     /* Read register value. */
     struct spi_buf rx_buf = { .buf = buf, .len = 1 };
@@ -119,7 +119,7 @@ static int adns9800_read_reg(const struct device *dev, uint8_t reg, uint8_t *buf
         return err;
     }
 
-    k_busy_wait(T_SRX);
+    k_usleep(T_SRX);
 
     data->last_read_burst = false;
     return err;
@@ -146,14 +146,14 @@ static int adns9800_write_reg(const struct device *dev, uint8_t reg, uint8_t val
         return err;
     }
 
-    k_busy_wait(T_SCLK_NCS_WR);
+    k_usleep(T_SCLK_NCS_WR);
 
     err = spi_cs_ctrl(dev, false);
     if (err) {
         return err;
     }
 
-    k_busy_wait(T_SWX);
+    k_usleep(T_SWX);
 
     data->last_read_burst = false;
     return err;
@@ -192,7 +192,7 @@ static int motion_burst_read(const struct device *dev, uint8_t *buf, size_t burs
         return err;
     }
 
-    k_busy_wait(T_SRAD_MOTBR); /* essential delay on ADNS9800 */
+    k_usleep(T_SRAD_MOTBR); /* essential delay on ADNS9800 */
 
     const struct spi_buf rx_buf = {
         .buf = buf,
@@ -212,7 +212,7 @@ static int motion_burst_read(const struct device *dev, uint8_t *buf, size_t burs
         return err;
     }
 
-    k_busy_wait(T_BEXIT);
+    k_usleep(T_BEXIT);
 
     data->last_read_burst = true;
     return err;
@@ -244,7 +244,7 @@ static int burst_write(const struct device *dev, uint8_t reg, const uint8_t *buf
         return err;
     }
 
-    k_busy_wait(T_BRSEP); /* essential delay on ADNS9800 */
+    k_usleep(T_BRSEP); /* essential delay on ADNS9800 */
 
     /* Write data */
     for (size_t i = 0; i < size; i++) {
@@ -256,7 +256,7 @@ static int burst_write(const struct device *dev, uint8_t reg, const uint8_t *buf
             break;
         }
 
-        k_busy_wait(T_BRSEP);
+        k_usleep(T_BRSEP);
         // LOG_DBG("Burst write buf [%i]: 0x%x", i, write_buf);
     }
 
@@ -266,7 +266,7 @@ static int burst_write(const struct device *dev, uint8_t reg, const uint8_t *buf
         return err;
     }
 
-    k_busy_wait(T_BEXIT);
+    k_usleep(T_BEXIT);
 
     data->last_read_burst = false;
     return err;
@@ -420,7 +420,7 @@ static int adns9800_async_init_fw_load_start(const struct device *dev) {
         return err;
     }
 
-    k_busy_wait(50);
+    k_usleep(50);
 
     // verify product id before upload fw
     uint8_t product_id;
