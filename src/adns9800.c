@@ -62,42 +62,14 @@ static int (*const async_init_fn[ASYNC_INIT_STEP_COUNT])(const struct device *de
     [ASYNC_INIT_STEP_ENABLE_LASER] = adns9800_async_init_enable_laser,
 };
 
-static int spi_cs_ctrl(const struct device *dev, bool enable) {
-    const struct avago_config *config = dev->config;
-    int err;
-
-    if (!enable) {
-        k_usleep(T_NCS_SCLK);
-    }
-
-    err = gpio_pin_set_dt(&config->cs_gpio, (int)enable);
-    if (err) {
-        LOG_ERR("SPI CS ctrl failed");
-    }
-
-    if (enable) {
-        k_usleep(T_NCS_SCLK);
-    }
-
-    return err;
-}
-
-static int adns9800_read_reg(const struct device *dev, uint8_t reg, uint8_t *buf) {
-    int err;
-    struct avago_data *data = dev->data;
-    const struct avago_config *config = dev->config;
-
+static int ___read_reg___(const struct spi_dt_spec *spi, uint8_t reg, uint8_t *buf, size_t size) {
+    int err = 0;
     __ASSERT_NO_MSG((reg & SPI_WRITE_BIT) == 0);
-
-    err = spi_cs_ctrl(dev, true);
-    if (err) {
-        return err;
-    }
 
     /* Write register address. */
     const struct spi_buf tx_buf = { .buf = &reg, .len = 1 };
     const struct spi_buf_set tx = { .buffers = &tx_buf, .count = 1 };
-    err = spi_write_dt(&config->spi, &tx);
+    err = spi_write_dt(spi, &tx);
     if (err) {
         LOG_ERR("Reg read failed on SPI write");
         return err;
@@ -106,165 +78,119 @@ static int adns9800_read_reg(const struct device *dev, uint8_t reg, uint8_t *buf
     k_usleep(T_SRAD);
 
     /* Read register value. */
-    struct spi_buf rx_buf = { .buf = buf, .len = 1 };
+    struct spi_buf rx_buf = { .buf = buf, .len = size };
     const struct spi_buf_set rx = { .buffers = &rx_buf, .count = 1 };
-    err = spi_read_dt(&config->spi, &rx);
+    err = spi_read_dt(spi, &rx);
     if (err) {
         LOG_ERR("Reg read failed on SPI read");
         return err;
     }
 
-    err = spi_cs_ctrl(dev, false);
-    if (err) {
-        return err;
-    }
-
     k_usleep(T_SRX);
-
-    data->last_read_burst = false;
     return err;
 }
 
-static int adns9800_write_reg(const struct device *dev, uint8_t reg, uint8_t val) {
-    int err;
-    struct avago_data *data = dev->data;
-    const struct avago_config *config = dev->config;
-
+static int ___write_reg___(const struct spi_dt_spec *spi, uint8_t reg, uint8_t val) {
+    int err = 0;
     __ASSERT_NO_MSG((reg & SPI_WRITE_BIT) == 0);
 
-    err = spi_cs_ctrl(dev, true);
-    if (err) {
-        return err;
-    }
-
-    uint8_t buf[] = {SPI_WRITE_BIT | reg, val};
-    const struct spi_buf tx_buf = { .buf = buf, .len = ARRAY_SIZE(buf) };
+    uint8_t buf[] = { SPI_WRITE_BIT | reg, val };
+    const struct spi_buf tx_buf = { .buf = buf, .len = 2 };
     const struct spi_buf_set tx = { .buffers = &tx_buf, .count = 1 };
-    err = spi_write_dt(&config->spi, &tx);
+    err = spi_write_dt(spi, &tx);
     if (err) {
         LOG_ERR("Reg write failed on SPI write");
         return err;
     }
 
-    k_usleep(T_SCLK_NCS_WR);
-
-    err = spi_cs_ctrl(dev, false);
-    if (err) {
-        return err;
-    }
-
     k_usleep(T_SWX);
-
-    data->last_read_burst = false;
     return err;
 }
 
-static int motion_burst_read(const struct device *dev, uint8_t *buf, size_t burst_size) {
-    int err;
+static int ___cs_rel___(const struct spi_dt_spec *spi) {
+    k_usleep(T_NCS_SCLK);
+    return spi_release_dt(spi);
+}
+
+static int adns9800_read_reg(const struct device *dev, uint8_t reg, uint8_t *buf) {
+    int err = 0;
+    const struct avago_config *config = dev->config;
+    __ASSERT_NO_MSG((reg & SPI_WRITE_BIT) == 0);
+
+    err = ___read_reg___(&config->spi, reg, buf, 1);
+    ___cs_rel___(&config->spi);
+
+    return err;
+}
+
+static int adns9800_write_reg(const struct device *dev, uint8_t reg, uint8_t val) {
+    int err = 0;
+    const struct avago_config *config = dev->config;
+    __ASSERT_NO_MSG((reg & SPI_WRITE_BIT) == 0);
+
+    err = ___write_reg___(&config->spi, reg, val);
+    ___cs_rel___(&config->spi);
+
+    return err;
+}
+
+static int adns9800_motion_burst_read(const struct device *dev, uint8_t *buf, 
+                                      size_t burst_size) {
+    int err = 0;
     struct avago_data *data = dev->data;
     const struct avago_config *config = dev->config;
-
     __ASSERT_NO_MSG(burst_size <= ADNS9800_MAX_BURST_SIZE);
 
-    /* Write any value to motion burst register only if there have been
-     * other SPI transmissions with sensor since last burst read.
-     */
     if (!data->last_read_burst) {
-        err = adns9800_write_reg(dev, ADNS9800_REG_MOTION_BURST, 0x00);
+        err = ___write_reg___(&config->spi, ADNS9800_REG_MOTION_BURST, 0x00);
         if (err) {
+            ___cs_rel___(&config->spi);
             return err;
         }
     }
 
-    err = spi_cs_ctrl(dev, true);
-    if (err) {
-        return err;
-    }
-
-    /* Send motion burst address */
-    uint8_t reg_buf[] = {ADNS9800_REG_MOTION_BURST};
-    const struct spi_buf tx_buf = {.buf = reg_buf, .len = ARRAY_SIZE(reg_buf)};
-    const struct spi_buf_set tx = {.buffers = &tx_buf, .count = 1};
-
-    err = spi_write_dt(&config->spi, &tx);
-    if (err) {
-        LOG_ERR("Motion burst failed on SPI write");
-        return err;
-    }
-
-    k_usleep(T_SRAD_MOTBR); /* essential delay on ADNS9800 */
-
-    const struct spi_buf rx_buf = {
-        .buf = buf,
-        .len = burst_size,
-    };
-    const struct spi_buf_set rx = {.buffers = &rx_buf, .count = 1};
-
-    err = spi_read_dt(&config->spi, &rx);
-    if (err) {
-        LOG_ERR("Motion burst failed on SPI read");
-        return err;
-    }
-
-    /* Terminate burst */
-    err = spi_cs_ctrl(dev, false);
-    if (err) {
-        return err;
-    }
+    err = ___read_reg___(&config->spi, ADNS9800_REG_MOTION_BURST, buf, burst_size);
+    ___cs_rel___(&config->spi);
 
     k_usleep(T_BEXIT);
-
     data->last_read_burst = true;
+
     return err;
 }
 
-static int burst_write(const struct device *dev, uint8_t reg, const uint8_t *buf, size_t size) {
+static int adns9800_burst_write(const struct device *dev, uint8_t reg, const uint8_t *buf, 
+                                size_t size) {
     int err;
     struct avago_data *data = dev->data;
     const struct avago_config *config = dev->config;
-
     __ASSERT_NO_MSG((reg & SPI_WRITE_BIT) == 0);
 
     /* Write address of burst register */
-    
-    // uint8_t write_buf = SPI_WRITE_BIT | reg;
     uint8_t write_buf = ADNS9800_REG_SROM_LOAD_BURST | 0x80;
-
     struct spi_buf tx_buf = {.buf = &write_buf, .len = 1};
     const struct spi_buf_set tx = {.buffers = &tx_buf, .count = 1};
-
-    err = spi_cs_ctrl(dev, true);
-    if (err) {
-        return err;
-    }
 
     err = spi_write_dt(&config->spi, &tx);
     if (err) {
         LOG_ERR("Burst write failed on SPI write");
+        ___cs_rel___(&config->spi);
         return err;
     }
 
-    k_usleep(T_BRSEP); /* essential delay on ADNS9800 */
+    k_usleep(T_BRSEP);
 
     /* Write data */
     for (size_t i = 0; i < size; i++) {
         write_buf = buf[i];
-
         err = spi_write_dt(&config->spi, &tx);
         if (err) {
             LOG_ERR("Burst write failed on SPI write (data)");
             break;
         }
-
         k_usleep(T_BRSEP);
-        // LOG_DBG("Burst write buf [%i]: 0x%x", i, write_buf);
     }
 
-    /* Terminate burst mode. */
-    err = spi_cs_ctrl(dev, false);
-    if (err) {
-        return err;
-    }
+    ___cs_rel___(&config->spi);
 
     k_usleep(T_BEXIT);
 
@@ -469,7 +395,7 @@ static int adns9800_async_init_fw_load_continue(const struct device *dev) {
     /* Write SROM file into SROM_Load_Burst register.
      * Data must start with SROM_Load_Burst address.
      */
-    err = burst_write(
+    err = adns9800_burst_write(
         dev,
         ADNS9800_REG_SROM_LOAD_BURST,
         adns9800_firmware_data,
@@ -526,24 +452,17 @@ static void set_interrupt(const struct device *dev, const bool en) {
 }
 
 static int adns9800_async_init_power_up(const struct device *dev) {
-    // struct avago_data *data = dev->data;
-    // const struct avago_config *config = dev->config;
-    // while (1) {
-    //     LOG_DBG("###### %d", 0);
-    //     gpio_pin_set_dt(&config->cs_gpio, (int)0);
-    //     k_msleep(1000);
-    //     LOG_DBG("###### %d", 1);
-    //     gpio_pin_set_dt(&config->cs_gpio, (int)1);
-    //     k_msleep(1000);
-    // }
-    // return 0;
+    const struct avago_config *config = dev->config;
+    const struct spi_dt_spec *spi = &config->spi;
+    const struct gpio_dt_spec cs_gpio = spi->config.cs.gpio;
 
     // ensure that the SPI port is reset
     // Drive NCS high, and then low to reset the SPI port.
     // - ACTIVE_LOW, set false to high.
-    spi_cs_ctrl(dev, false);
-    spi_cs_ctrl(dev, true);
-    spi_cs_ctrl(dev, false);
+    gpio_pin_set_dt(&cs_gpio, GPIO_OUTPUT_ACTIVE);
+    k_usleep(1000); // Wait for 1ms
+    gpio_pin_set_dt(&cs_gpio, GPIO_OUTPUT_INACTIVE);
+    k_usleep(1000); // Wait for 1ms
 
     return adns9800_write_reg(dev, ADNS9800_REG_POWER_UP_RESET, ADNS9800_POWERUP_CMD_RESET);
 }
@@ -664,7 +583,7 @@ static int adns9800_report_data(const struct device *dev) {
     int64_t now = k_uptime_get();
 #endif
 
-    int err = motion_burst_read(dev, buf, ADNS9800_BURST_SIZE);
+    int err = adns9800_motion_burst_read(dev, buf, ADNS9800_BURST_SIZE);
     if (err) {
         return err;
     }
@@ -791,23 +710,29 @@ static int adns9800_init(const struct device *dev) {
     const struct avago_config *config = dev->config;
     int err;
 
+    if (!spi_is_ready_dt(&config->spi)) {
+		LOG_ERR("%s is not ready", config->spi.bus->name);
+		return -ENODEV;
+	}
+
+    // check readiness of cs gpio pin and init it to inactive
+    const struct gpio_dt_spec cs_gpio = config->spi.config.cs.gpio;
+    if (!device_is_ready(cs_gpio.port)) {
+        LOG_ERR("SPI CS device not ready");
+        return -ENODEV;
+    }
+
+    err = gpio_pin_configure_dt(&cs_gpio, GPIO_OUTPUT_INACTIVE);
+    if (err) {
+        LOG_ERR("Cannot configure SPI CS GPIO");
+        return err;
+    }
+
     // init device pointer
     data->dev = dev;
 
     // init trigger handler work
     k_work_init(&data->trigger_work, adns9800_work_callback);
-
-    // check readiness of cs gpio pin and init it to inactive
-    if (!device_is_ready(config->cs_gpio.port)) {
-        LOG_ERR("SPI CS device not ready");
-        return -ENODEV;
-    }
-
-    err = gpio_pin_configure_dt(&config->cs_gpio, GPIO_OUTPUT_INACTIVE);
-    if (err) {
-        LOG_ERR("Cannot configure SPI CS GPIO");
-        return err;
-    }
 
     // init irq routine
     err = adns9800_init_irq(dev);
@@ -888,20 +813,13 @@ static const struct sensor_driver_api adns9800_driver_api = {
     .attr_set = adns9800_attr_set,
 };
 
-#define ASND9800_SPI_MODE (SPI_WORD_SET(8) | SPI_MODE_CPOL | SPI_MODE_CPHA | SPI_TRANSFER_MSB)
+#define ASND9800_SPI_MODE (SPI_WORD_SET(8) | SPI_MODE_CPOL | SPI_MODE_CPHA | SPI_TRANSFER_MSB |    \
+                           SPI_OP_MODE_MASTER | SPI_HOLD_ON_CS | SPI_LOCK_ON)
 
 #define ASND9800_DEFINE(n)                                                                         \
     static struct avago_data data##n;                                                              \
     static const struct avago_config config##n = {                                                 \
-        .spi = {                                                                                   \
-            .bus = DEVICE_DT_GET(DT_INST_BUS(n)),                                                  \
-            .config = {                                                                            \
-                .frequency = DT_INST_PROP(n, spi_max_frequency),                                   \
-                .operation = ASND9800_SPI_MODE,                                                    \
-                .slave = DT_INST_REG_ADDR(n),                                                      \
-             },                                                                                    \
-        },                                                                                         \
-        .cs_gpio = SPI_CS_GPIOS_DT_SPEC_GET(DT_DRV_INST(n)),                                       \
+        .spi = SPI_DT_SPEC_INST_GET(n, ASND9800_SPI_MODE, 0),                                      \
         .irq_gpio = GPIO_DT_SPEC_INST_GET(n, irq_gpios),                                           \
         .cpi = DT_PROP(DT_DRV_INST(n), cpi),                                                       \
         .evt_type = DT_PROP(DT_DRV_INST(n), evt_type),                                             \

@@ -34,7 +34,6 @@ struct avago_data {
 // device config data structure
 struct avago_config {
 	struct spi_dt_spec spi;
-    struct gpio_dt_spec cs_gpio;
     struct gpio_dt_spec irq_gpio;
     uint16_t cpi;
     uint8_t evt_type;
